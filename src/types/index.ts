@@ -88,3 +88,72 @@ export interface CategorySpending {
   name: string;
   value: number;
 }
+
+export type TimeDimension = 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type ComparisonType = 'none' | 'last_period' | 'same_period_last_year';
+
+export interface TimeRange {
+  start: string;
+  end: string;
+}
+
+export interface DailySpending {
+  date: string;
+  amount: number;
+  category?: string;
+}
+
+export interface WeeklySpending {
+  week: string;
+  weekStart: string;
+  weekEnd: string;
+  amount: number;
+}
+
+export interface QuarterlySpending {
+  quarter: string;
+  year: number;
+  q: number;
+  amount: number;
+}
+
+export interface YearlySpending {
+  year: string;
+  amount: number;
+}
+
+export interface ComparisonData {
+  period: string;
+  current: number;
+  previous: number;
+  difference: number;
+  differencePercent: number;
+}
+
+export interface PredictionData {
+  period: string;
+  actual?: number;
+  predicted: number;
+  lowerBound: number;
+  upperBound: number;
+}
+
+export interface AnomalyData {
+  period: string;
+  amount: number;
+  type: 'high' | 'low';
+  expectedAmount: number;
+  deviationPercent: number;
+  description: string;
+}
+
+export interface DrillDownData {
+  period: string;
+  totalAmount: number;
+  items: {
+    name: string;
+    amount: number;
+    category: string;
+    date: string;
+  }[];
+}

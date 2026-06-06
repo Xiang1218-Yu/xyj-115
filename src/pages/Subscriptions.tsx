@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -13,22 +13,36 @@ import {
   Receipt
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   PieChart as RechartsPie,
   Pie,
   Cell,
-  Legend
+  Legend,
+  ResponsiveContainer,
+  Tooltip
 } from 'recharts';
 import SubscriptionCard from '@/components/SubscriptionCard';
 import { useStore } from '@/store/useStore';
-import { bills, monthlySpending, categorySpending } from '@/mock/subscriptions';
+import { bills, monthlySpending, categorySpending, monthlySpending2025 } from '@/mock/subscriptions';
 import { cn } from '@/lib/utils';
+import TimeControls from '@/components/billing/TimeControls';
+import TrendChart from '@/components/billing/TrendChart';
+import ComparisonChart from '@/components/billing/ComparisonChart';
+import PredictionChart from '@/components/billing/PredictionChart';
+import AnomalyAlert from '@/components/billing/AnomalyAlert';
+import DrillDownModal from '@/components/billing/DrillDownModal';
+import type { TimeDimension, TimeRange, ComparisonType, DrillDownData as DrillDownDataType } from '@/types';
+import {
+  getComparisonData,
+  predictSpending,
+  detectAnomalies,
+  getDrillDownData,
+  getPresetTimeRanges,
+} from '@/lib/billingAnalysis';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -38,6 +52,36 @@ export default function Subscriptions() {
   const { subscriptions, downloadInvoice } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('active');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const [timeDimension, setTimeDimension] = useState<TimeDimension>('month');
+  const presets = getPresetTimeRanges();
+  const [timeRange, setTimeRange] = useState<TimeRange>(presets.thisYear);
+  const [comparisonType, setComparisonType] = useState<ComparisonType>('same_period_last_year');
+
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
+  const [drillDownData, setDrillDownData] = useState<DrillDownDataType | null>(null);
+  const [dismissedAnomalies, setDismissedAnomalies] = useState<string[]>([]);
+
+  const comparisonData = useMemo(() => getComparisonData(comparisonType), [comparisonType]);
+  const predictionData = useMemo(() => predictSpending(monthlySpending2025.slice(0, 6), 6), []);
+  const anomalies = useMemo(() => detectAnomalies(monthlySpending2025, 25), [])
+    .filter(a => !dismissedAnomalies.includes(a.period));
+
+  const handleBarClick = (period: string) => {
+    const data = getDrillDownData(period);
+    if (data) {
+      setDrillDownData(data);
+      setDrillDownOpen(true);
+    }
+  };
+
+  const handleDismissAnomaly = (period: string) => {
+    setDismissedAnomalies(prev => [...prev, period]);
+  };
+
+  const handleViewAnomalyDetail = (period: string) => {
+    handleBarClick(period);
+  };
 
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
   const inactiveSubscriptions = subscriptions.filter(s => s.status !== 'active');
@@ -277,6 +321,87 @@ export default function Subscriptions() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
+            <TimeControls
+              timeDimension={timeDimension}
+              onTimeDimensionChange={setTimeDimension}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+              comparisonType={comparisonType}
+              onComparisonTypeChange={setComparisonType}
+            />
+
+            <AnomalyAlert
+              anomalies={anomalies}
+              onDismiss={handleDismissAnomaly}
+              onViewDetail={handleViewAnomalyDetail}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <TrendChart
+                timeDimension={timeDimension}
+                timeRange={timeRange}
+                anomalies={anomalies}
+                onBarClick={handleBarClick}
+              />
+
+              <div className="card">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <PieChart className="w-5 h-5 text-secondary-400" />
+                    分类占比
+                  </h3>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPie>
+                      <Pie
+                        data={categorySpending}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {categorySpending.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#fff',
+                        }}
+                        formatter={(value: number) => [`¥${value}`, '支出']}
+                      />
+                      <Legend
+                        formatter={(value) => <span className="text-gray-300 text-sm">{value}</span>}
+                      />
+                    </RechartsPie>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {comparisonType !== 'none' && (
+              <div className="mb-6">
+                <ComparisonChart
+                  data={comparisonData}
+                  comparisonType={comparisonType}
+                  onBarClick={handleBarClick}
+                />
+              </div>
+            )}
+
+            <div className="mb-6">
+              <PredictionChart
+                data={predictionData}
+                onPointClick={handleBarClick}
+              />
+            </div>
+
             <div className="card mb-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -359,6 +484,12 @@ export default function Subscriptions() {
                 </table>
               </div>
             </div>
+
+            <DrillDownModal
+              isOpen={drillDownOpen}
+              onClose={() => setDrillDownOpen(false)}
+              data={drillDownData}
+            />
           </motion.div>
         )}
       </div>
