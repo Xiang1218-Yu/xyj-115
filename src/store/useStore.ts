@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import type { User, UserSubscription, Tool, Category, SortOption, SubscriptionFilter, UsersRange } from '@/types';
+import type { User, UserSubscription, Tool, Category, SortOption, SubscriptionFilter, UsersRange, TeamMember, TeamRole } from '@/types';
 import { userSubscriptions } from '@/mock/subscriptions';
 import { tools } from '@/mock/tools';
+import { teamMembers as initialTeamMembers } from '@/mock/team';
 
 interface NotificationSettings {
   emailNotifications: boolean;
@@ -11,10 +12,20 @@ interface NotificationSettings {
   securityAlerts: boolean;
 }
 
+interface TeamSettings {
+  teamName: string;
+  teamDescription: string;
+  twoFactorRequired: boolean;
+  ssoEnabled: boolean;
+  sessionTimeout: boolean;
+}
+
 interface Store {
   user: User | null;
   subscriptions: UserSubscription[];
   tools: Tool[];
+  teamMembers: TeamMember[];
+  teamSettings: TeamSettings;
   selectedCategory: Category | 'all';
   searchQuery: string;
   sortBy: SortOption;
@@ -54,6 +65,10 @@ interface Store {
   clearAllFilters: () => void;
   getAllTags: () => string[];
   getPriceRange: () => { min: number; max: number };
+  inviteMember: (email: string, role: TeamRole) => Promise<boolean>;
+  removeMember: (id: string) => void;
+  changeMemberRole: (id: string, role: TeamRole) => void;
+  updateTeamSettings: (settings: Partial<TeamSettings>) => void;
 }
 
 const defaultNotificationSettings: NotificationSettings = {
@@ -64,10 +79,20 @@ const defaultNotificationSettings: NotificationSettings = {
   securityAlerts: true,
 };
 
+const defaultTeamSettings: TeamSettings = {
+  teamName: '创新科技团队',
+  teamDescription: '专注于产品创新和开发的高效团队',
+  twoFactorRequired: true,
+  ssoEnabled: false,
+  sessionTimeout: true,
+};
+
 export const useStore = create<Store>((set, get) => ({
   user: null,
   subscriptions: userSubscriptions,
   tools: tools,
+  teamMembers: initialTeamMembers,
+  teamSettings: defaultTeamSettings,
   selectedCategory: 'all',
   searchQuery: '',
   sortBy: 'popular',
@@ -335,4 +360,43 @@ export const useStore = create<Store>((set, get) => ({
       max: Math.max(...prices),
     };
   },
+
+  inviteMember: async (email, role) => {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    if (!email) return false;
+    
+    const newMember: TeamMember = {
+      id: 'member-' + Date.now(),
+      name: email.split('@')[0],
+      email: email,
+      avatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20${encodeURIComponent(email)}&image_size=square`,
+      role: role,
+      joinDate: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      subscriptions: [],
+    };
+    
+    set((state) => ({
+      teamMembers: [...state.teamMembers, newMember],
+    }));
+    
+    return true;
+  },
+
+  removeMember: (id) =>
+    set((state) => ({
+      teamMembers: state.teamMembers.filter(m => m.id !== id),
+    })),
+
+  changeMemberRole: (id, role) =>
+    set((state) => ({
+      teamMembers: state.teamMembers.map(m =>
+        m.id === id ? { ...m, role } : m
+      ),
+    })),
+
+  updateTeamSettings: (settings) =>
+    set((state) => ({
+      teamSettings: { ...state.teamSettings, ...settings },
+    })),
 }));
