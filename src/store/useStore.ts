@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserSubscription, Tool, Category, SortOption, SubscriptionFilter, UsersRange, TeamMember, TeamRole } from '@/types';
-import { userSubscriptions } from '@/mock/subscriptions';
-import { tools } from '@/mock/tools';
-import { teamMembers as initialTeamMembers } from '@/mock/team';
+import { userSubscriptions as defaultSubscriptions } from '@/mock/subscriptions';
+import { tools as defaultTools } from '@/mock/tools';
+import { teamMembers as defaultTeamMembers } from '@/mock/team';
 
 interface NotificationSettings {
   emailNotifications: boolean;
@@ -69,6 +70,7 @@ interface Store {
   removeMember: (id: string) => void;
   changeMemberRole: (id: string, role: TeamRole) => void;
   updateTeamSettings: (settings: Partial<TeamSettings>) => void;
+  resetToDefaults: () => void;
 }
 
 const defaultNotificationSettings: NotificationSettings = {
@@ -87,146 +89,148 @@ const defaultTeamSettings: TeamSettings = {
   sessionTimeout: true,
 };
 
-export const useStore = create<Store>((set, get) => ({
-  user: null,
-  subscriptions: userSubscriptions,
-  tools: tools,
-  teamMembers: initialTeamMembers,
-  teamSettings: defaultTeamSettings,
-  selectedCategory: 'all',
-  searchQuery: '',
-  sortBy: 'popular',
-  priceMin: 0,
-  priceMax: 1000,
-  ratingMin: 0,
-  ratingMax: 5,
-  usersRange: 'all',
-  selectedTags: [],
-  subscriptionFilter: 'all',
-  isAuthenticated: false,
-  notificationSettings: defaultNotificationSettings,
-  userPassword: '',
+export const useStore = create<Store>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      subscriptions: defaultSubscriptions,
+      tools: defaultTools,
+      teamMembers: defaultTeamMembers,
+      teamSettings: defaultTeamSettings,
+      selectedCategory: 'all',
+      searchQuery: '',
+      sortBy: 'popular',
+      priceMin: 0,
+      priceMax: 1000,
+      ratingMin: 0,
+      ratingMax: 5,
+      usersRange: 'all',
+      selectedTags: [],
+      subscriptionFilter: 'all',
+      isAuthenticated: false,
+      notificationSettings: defaultNotificationSettings,
+      userPassword: '',
 
-  setUser: (user) => set({ user }),
-  
-  setSelectedCategory: (category) => set({ selectedCategory: category }),
-  
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  
-  setSortBy: (sort) => set({ sortBy: sort }),
-  
-  setPriceRange: (min, max) => set({ priceMin: min, priceMax: max }),
-  
-  setRatingRange: (min, max) => set({ ratingMin: min, ratingMax: max }),
-  
-  setUsersRange: (range) => set({ usersRange: range }),
-  
-  setSelectedTags: (tags) => set({ selectedTags: tags }),
-  
-  toggleTag: (tag) => set((state) => ({
-    selectedTags: state.selectedTags.includes(tag)
-      ? state.selectedTags.filter(t => t !== tag)
-      : [...state.selectedTags, tag]
-  })),
-  
-  setSubscriptionFilter: (filter) => set({ subscriptionFilter: filter }),
-  
-  login: async (email, password) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const { userPassword, user } = get();
-    
-    if (email && password) {
-      if (user && user.email === email && userPassword === password) {
-        set({ isAuthenticated: true });
-        return true;
-      }
+      setUser: (user) => set({ user }),
       
-      const newUser: User = {
-        id: 'user-' + Date.now(),
-        name: email.split('@')[0],
-        email: email,
-        avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
-      };
-      set({ user: newUser, isAuthenticated: true, userPassword: password });
-      return true;
-    }
-    return false;
-  },
-  
-  register: async (name, email, password) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    if (name && email && password) {
-      const newUser: User = {
-        id: 'user-' + Date.now(),
-        name: name,
-        email: email,
-        avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
-      };
-      set({ user: newUser, isAuthenticated: true, userPassword: password });
-      return true;
-    }
-    return false;
-  },
-  
-  logout: () => set({ user: null, isAuthenticated: false }),
-  
-  updateUserProfile: (updates) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, ...updates } : null,
-    })),
-  
-  changePassword: async (oldPassword, newPassword) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const { userPassword } = get();
-    if (userPassword === oldPassword) {
-      set({ userPassword: newPassword });
-      return true;
-    }
-    return false;
-  },
-  
-  updateNotificationSettings: (settings) =>
-    set((state) => ({
-      notificationSettings: { ...state.notificationSettings, ...settings },
-    })),
-  
-  addSubscription: (subscription) => 
-    set((state) => ({ subscriptions: [...state.subscriptions, subscription] })),
-  
-  cancelSubscription: (id) =>
-    set((state) => ({
-      subscriptions: state.subscriptions.map((sub) =>
-        sub.id === id ? { ...sub, status: 'cancelled' as const, autoRenew: false } : sub
-      ),
-    })),
-  
-  renewSubscription: (id) =>
-    set((state) => ({
-      subscriptions: state.subscriptions.map((sub) =>
-        sub.id === id 
-          ? { 
-              ...sub, 
-              status: 'active' as const, 
-              autoRenew: true,
-              startDate: new Date().toISOString().split('T')[0],
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            } 
-          : sub
-      ),
-    })),
-  
-  toggleAutoRenew: (id) =>
-    set((state) => ({
-      subscriptions: state.subscriptions.map((sub) =>
-        sub.id === id ? { ...sub, autoRenew: !sub.autoRenew } : sub
-      ),
-    })),
-  
-  downloadInvoice: (id) => {
-    const subscription = get().subscriptions.find(s => s.id === id);
-    if (!subscription) return;
-    
-    const invoiceContent = `
+      setSelectedCategory: (category) => set({ selectedCategory: category }),
+      
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      
+      setSortBy: (sort) => set({ sortBy: sort }),
+      
+      setPriceRange: (min, max) => set({ priceMin: min, priceMax: max }),
+      
+      setRatingRange: (min, max) => set({ ratingMin: min, ratingMax: max }),
+      
+      setUsersRange: (range) => set({ usersRange: range }),
+      
+      setSelectedTags: (tags) => set({ selectedTags: tags }),
+      
+      toggleTag: (tag) => set((state) => ({
+        selectedTags: state.selectedTags.includes(tag)
+          ? state.selectedTags.filter(t => t !== tag)
+          : [...state.selectedTags, tag]
+      })),
+      
+      setSubscriptionFilter: (filter) => set({ subscriptionFilter: filter }),
+      
+      login: async (email, password) => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { userPassword, user } = get();
+        
+        if (email && password) {
+          if (user && user.email === email && userPassword === password) {
+            set({ isAuthenticated: true });
+            return true;
+          }
+          
+          const newUser: User = {
+            id: 'user-' + Date.now(),
+            name: email.split('@')[0],
+            email: email,
+            avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
+          };
+          set({ user: newUser, isAuthenticated: true, userPassword: password });
+          return true;
+        }
+        return false;
+      },
+      
+      register: async (name, email, password) => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (name && email && password) {
+          const newUser: User = {
+            id: 'user-' + Date.now(),
+            name: name,
+            email: email,
+            avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
+          };
+          set({ user: newUser, isAuthenticated: true, userPassword: password });
+          return true;
+        }
+        return false;
+      },
+      
+      logout: () => set({ user: null, isAuthenticated: false }),
+      
+      updateUserProfile: (updates) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null,
+        })),
+      
+      changePassword: async (oldPassword, newPassword) => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { userPassword } = get();
+        if (userPassword === oldPassword) {
+          set({ userPassword: newPassword });
+          return true;
+        }
+        return false;
+      },
+      
+      updateNotificationSettings: (settings) =>
+        set((state) => ({
+          notificationSettings: { ...state.notificationSettings, ...settings },
+        })),
+      
+      addSubscription: (subscription) => 
+        set((state) => ({ subscriptions: [...state.subscriptions, subscription] })),
+      
+      cancelSubscription: (id) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.map((sub) =>
+            sub.id === id ? { ...sub, status: 'cancelled' as const, autoRenew: false } : sub
+          ),
+        })),
+      
+      renewSubscription: (id) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.map((sub) =>
+            sub.id === id 
+              ? { 
+                  ...sub, 
+                  status: 'active' as const, 
+                  autoRenew: true,
+                  startDate: new Date().toISOString().split('T')[0],
+                  endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                } 
+              : sub
+          ),
+        })),
+      
+      toggleAutoRenew: (id) =>
+        set((state) => ({
+          subscriptions: state.subscriptions.map((sub) =>
+            sub.id === id ? { ...sub, autoRenew: !sub.autoRenew } : sub
+          ),
+        })),
+      
+      downloadInvoice: (id) => {
+        const subscription = get().subscriptions.find(s => s.id === id);
+        if (!subscription) return;
+        
+        const invoiceContent = `
 发票
 =====================================
 发票编号: INV-${id.toUpperCase()}
@@ -247,156 +251,191 @@ export const useStore = create<Store>((set, get) => ({
 
 感谢您使用 SubHub!
     `.trim();
-    
-    const blob = new Blob([invoiceContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `发票-${subscription.toolName}-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  },
-  
-  getFilteredTools: () => {
-    const { tools, selectedCategory, searchQuery, priceMin, priceMax, ratingMin, ratingMax, usersRange, selectedTags, subscriptionFilter, sortBy, subscriptions } = get();
-    
-    const filtered = tools.filter((tool) => {
-      const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
+        
+        const blob = new Blob([invoiceContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `发票-${subscription.toolName}-${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      },
       
-      const matchesSearch = !searchQuery ||
-        tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tool.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tool.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      getFilteredTools: () => {
+        const { tools, selectedCategory, searchQuery, priceMin, priceMax, ratingMin, ratingMax, usersRange, selectedTags, subscriptionFilter, sortBy, subscriptions } = get();
+        
+        const filtered = tools.filter((tool) => {
+          const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
+          
+          const matchesSearch = !searchQuery ||
+            tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            tool.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            tool.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+          
+          const minPrice = Math.min(...tool.plans.map(p => p.price));
+          const matchesPrice = minPrice >= priceMin && minPrice <= priceMax;
+          
+          const matchesRating = tool.rating >= ratingMin && tool.rating <= ratingMax;
+          
+          let matchesUsers = true;
+          switch (usersRange) {
+            case 'lt-10k':
+              matchesUsers = tool.usersCount < 10000;
+              break;
+            case '10k-50k':
+              matchesUsers = tool.usersCount >= 10000 && tool.usersCount < 50000;
+              break;
+            case '50k-100k':
+              matchesUsers = tool.usersCount >= 50000 && tool.usersCount < 100000;
+              break;
+            case 'gt-100k':
+              matchesUsers = tool.usersCount >= 100000;
+              break;
+          }
+          
+          const matchesTags = selectedTags.length === 0 ||
+            selectedTags.every(tag => tool.tags.includes(tag));
+          
+          let matchesSubscription = true;
+          const userSub = subscriptions.find(s => s.toolId === tool.id);
+          switch (subscriptionFilter) {
+            case 'subscribed':
+              matchesSubscription = !!userSub && userSub.status === 'active';
+              break;
+            case 'not-subscribed':
+              matchesSubscription = !userSub || userSub.status !== 'active';
+              break;
+            case 'expired':
+              matchesSubscription = !!userSub && userSub.status === 'expired';
+              break;
+          }
+          
+          return matchesCategory && matchesSearch && matchesPrice && matchesRating && matchesUsers && matchesTags && matchesSubscription;
+        });
+        
+        return [...filtered].sort((a, b) => {
+          switch (sortBy) {
+            case 'rating':
+              return b.rating - a.rating;
+            case 'price-low':
+              return Math.min(...a.plans.map(p => p.price)) - Math.min(...b.plans.map(p => p.price));
+            case 'price-high':
+              return Math.min(...b.plans.map(p => p.price)) - Math.min(...a.plans.map(p => p.price));
+            case 'newest':
+              return parseInt(b.id) - parseInt(a.id);
+            case 'users-desc':
+              return b.usersCount - a.usersCount;
+            case 'users-asc':
+              return a.usersCount - b.usersCount;
+            case 'popular':
+            default:
+              return b.usersCount - a.usersCount;
+          }
+        });
+      },
       
-      const minPrice = Math.min(...tool.plans.map(p => p.price));
-      const matchesPrice = minPrice >= priceMin && minPrice <= priceMax;
+      clearAllFilters: () => set({
+        selectedCategory: 'all',
+        searchQuery: '',
+        sortBy: 'popular',
+        priceMin: 0,
+        priceMax: 1000,
+        ratingMin: 0,
+        ratingMax: 5,
+        usersRange: 'all',
+        selectedTags: [],
+        subscriptionFilter: 'all',
+      }),
       
-      const matchesRating = tool.rating >= ratingMin && tool.rating <= ratingMax;
+      getAllTags: () => {
+        const { tools } = get();
+        const tagSet = new Set<string>();
+        tools.forEach(tool => tool.tags.forEach(tag => tagSet.add(tag)));
+        return Array.from(tagSet).sort();
+      },
       
-      let matchesUsers = true;
-      switch (usersRange) {
-        case 'lt-10k':
-          matchesUsers = tool.usersCount < 10000;
-          break;
-        case '10k-50k':
-          matchesUsers = tool.usersCount >= 10000 && tool.usersCount < 50000;
-          break;
-        case '50k-100k':
-          matchesUsers = tool.usersCount >= 50000 && tool.usersCount < 100000;
-          break;
-        case 'gt-100k':
-          matchesUsers = tool.usersCount >= 100000;
-          break;
-      }
-      
-      const matchesTags = selectedTags.length === 0 ||
-        selectedTags.every(tag => tool.tags.includes(tag));
-      
-      let matchesSubscription = true;
-      const userSub = subscriptions.find(s => s.toolId === tool.id);
-      switch (subscriptionFilter) {
-        case 'subscribed':
-          matchesSubscription = !!userSub && userSub.status === 'active';
-          break;
-        case 'not-subscribed':
-          matchesSubscription = !userSub || userSub.status !== 'active';
-          break;
-        case 'expired':
-          matchesSubscription = !!userSub && userSub.status === 'expired';
-          break;
-      }
-      
-      return matchesCategory && matchesSearch && matchesPrice && matchesRating && matchesUsers && matchesTags && matchesSubscription;
-    });
-    
-    return [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case 'rating':
-          return b.rating - a.rating;
-        case 'price-low':
-          return Math.min(...a.plans.map(p => p.price)) - Math.min(...b.plans.map(p => p.price));
-        case 'price-high':
-          return Math.min(...b.plans.map(p => p.price)) - Math.min(...a.plans.map(p => p.price));
-        case 'newest':
-          return parseInt(b.id) - parseInt(a.id);
-        case 'users-desc':
-          return b.usersCount - a.usersCount;
-        case 'users-asc':
-          return a.usersCount - b.usersCount;
-        case 'popular':
-        default:
-          return b.usersCount - a.usersCount;
-      }
-    });
-  },
-  
-  clearAllFilters: () => set({
-    selectedCategory: 'all',
-    searchQuery: '',
-    sortBy: 'popular',
-    priceMin: 0,
-    priceMax: 1000,
-    ratingMin: 0,
-    ratingMax: 5,
-    usersRange: 'all',
-    selectedTags: [],
-    subscriptionFilter: 'all',
-  }),
-  
-  getAllTags: () => {
-    const { tools } = get();
-    const tagSet = new Set<string>();
-    tools.forEach(tool => tool.tags.forEach(tag => tagSet.add(tag)));
-    return Array.from(tagSet).sort();
-  },
-  
-  getPriceRange: () => {
-    const { tools } = get();
-    const prices = tools.flatMap(tool => tool.plans.map(p => p.price));
-    return {
-      min: Math.min(...prices),
-      max: Math.max(...prices),
-    };
-  },
+      getPriceRange: () => {
+        const { tools } = get();
+        const prices = tools.flatMap(tool => tool.plans.map(p => p.price));
+        return {
+          min: Math.min(...prices),
+          max: Math.max(...prices),
+        };
+      },
 
-  inviteMember: async (email, role) => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    if (!email) return false;
-    
-    const newMember: TeamMember = {
-      id: 'member-' + Date.now(),
-      name: email.split('@')[0],
-      email: email,
-      avatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20${encodeURIComponent(email)}&image_size=square`,
-      role: role,
-      joinDate: new Date().toISOString().split('T')[0],
-      status: 'pending',
-      subscriptions: [],
-    };
-    
-    set((state) => ({
-      teamMembers: [...state.teamMembers, newMember],
-    }));
-    
-    return true;
-  },
+      inviteMember: async (email, role) => {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        if (!email) return false;
+        
+        const newMember: TeamMember = {
+          id: 'member-' + Date.now(),
+          name: email.split('@')[0],
+          email: email,
+          avatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20${encodeURIComponent(email)}&image_size=square`,
+          role: role,
+          joinDate: new Date().toISOString().split('T')[0],
+          status: 'pending',
+          subscriptions: [],
+        };
+        
+        set((state) => ({
+          teamMembers: [...state.teamMembers, newMember],
+        }));
+        
+        return true;
+      },
 
-  removeMember: (id) =>
-    set((state) => ({
-      teamMembers: state.teamMembers.filter(m => m.id !== id),
-    })),
+      removeMember: (id) =>
+        set((state) => ({
+          teamMembers: state.teamMembers.filter(m => m.id !== id),
+        })),
 
-  changeMemberRole: (id, role) =>
-    set((state) => ({
-      teamMembers: state.teamMembers.map(m =>
-        m.id === id ? { ...m, role } : m
-      ),
-    })),
+      changeMemberRole: (id, role) =>
+        set((state) => ({
+          teamMembers: state.teamMembers.map(m =>
+            m.id === id ? { ...m, role } : m
+          ),
+        })),
 
-  updateTeamSettings: (settings) =>
-    set((state) => ({
-      teamSettings: { ...state.teamSettings, ...settings },
-    })),
-}));
+      updateTeamSettings: (settings) =>
+        set((state) => ({
+          teamSettings: { ...state.teamSettings, ...settings },
+        })),
+
+      resetToDefaults: () => set({
+        user: null,
+        subscriptions: defaultSubscriptions,
+        teamMembers: defaultTeamMembers,
+        teamSettings: defaultTeamSettings,
+        isAuthenticated: false,
+        notificationSettings: defaultNotificationSettings,
+        userPassword: '',
+        selectedCategory: 'all',
+        searchQuery: '',
+        sortBy: 'popular',
+        priceMin: 0,
+        priceMax: 1000,
+        ratingMin: 0,
+        ratingMax: 5,
+        usersRange: 'all',
+        selectedTags: [],
+        subscriptionFilter: 'all',
+      }),
+    }),
+    {
+      name: 'subhub-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        subscriptions: state.subscriptions,
+        teamMembers: state.teamMembers,
+        teamSettings: state.teamSettings,
+        isAuthenticated: state.isAuthenticated,
+        notificationSettings: state.notificationSettings,
+        userPassword: state.userPassword,
+      }),
+    }
+  )
+);

@@ -1,25 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Zap } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 export default function Login() {
-  const { login } = useStore();
+  const { login, isAuthenticated } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const from = (location.state as { from?: string })?.from || '/';
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
     
     const success = await login(email, password);
     
     if (success) {
-      navigate('/');
+      navigate(from, { replace: true });
+    } else {
+      setError('登录失败，请检查邮箱和密码');
     }
     
     setIsLoading(false);
@@ -102,6 +115,12 @@ export default function Login() {
                 记住我
               </label>
             </div>
+
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {error}
+              </div>
+            )}
 
             <button
               type="submit"

@@ -16,11 +16,14 @@ import {
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { to: '/', label: '首页', icon: Zap },
-  { to: '/market', label: '工具市场', icon: LayoutGrid },
-  { to: '/subscriptions', label: '订阅管理', icon: CreditCard },
-  { to: '/team', label: '团队协作', icon: Users },
+const publicNavItems = [
+  { to: '/', label: '首页', icon: Zap, requiresAuth: false },
+  { to: '/market', label: '工具市场', icon: LayoutGrid, requiresAuth: false },
+];
+
+const privateNavItems = [
+  { to: '/subscriptions', label: '订阅管理', icon: CreditCard, requiresAuth: true },
+  { to: '/team', label: '团队协作', icon: Users, requiresAuth: true },
 ];
 
 export default function Navbar() {
@@ -29,6 +32,8 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useStore();
   const navigate = useNavigate();
+
+  const navItems = [...publicNavItems, ...privateNavItems];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,6 +47,13 @@ export default function Navbar() {
     logout();
     setUserMenuOpen(false);
     navigate('/login');
+  };
+
+  const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
+    if (item.requiresAuth && !isAuthenticated) {
+      e.preventDefault();
+      navigate('/login', { state: { from: item.to } });
+    }
   };
 
   return (
@@ -73,10 +85,13 @@ export default function Navbar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={(e) => handleNavClick(e, item)}
                   className={({ isActive }) =>
                     cn(
                       'px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2',
-                      isActive
+                      item.requiresAuth && !isAuthenticated
+                        ? 'text-gray-500 hover:text-gray-400 cursor-pointer'
+                        : isActive
                         ? 'bg-primary-500/20 text-primary-400'
                         : 'text-gray-400 hover:text-white hover:bg-white/5'
                     )
@@ -84,6 +99,11 @@ export default function Navbar() {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
+                  {item.requiresAuth && !isAuthenticated && (
+                    <span className="text-xs px-1.5 py-0.5 bg-primary-500/20 text-primary-400 rounded">
+                      需登录
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -196,18 +216,32 @@ export default function Navbar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    handleNavClick(e, item);
+                    if (!(item.requiresAuth && !isAuthenticated)) {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
                   className={({ isActive }) =>
                     cn(
                       'px-4 py-3 rounded-xl font-medium transition-all flex items-center gap-3',
-                      isActive
+                      item.requiresAuth && !isAuthenticated
+                        ? 'text-gray-500 hover:text-gray-400 cursor-pointer'
+                        : isActive
                         ? 'bg-primary-500/20 text-primary-400'
                         : 'text-gray-400 hover:text-white hover:bg-white/5'
                     )
                   }
                 >
                   <item.icon className="w-5 h-5" />
-                  {item.label}
+                  <div className="flex-1 flex items-center justify-between">
+                    <span>{item.label}</span>
+                    {item.requiresAuth && !isAuthenticated && (
+                      <span className="text-xs px-1.5 py-0.5 bg-primary-500/20 text-primary-400 rounded">
+                        需登录
+                      </span>
+                    )}
+                  </div>
                 </NavLink>
               ))}
             </nav>
