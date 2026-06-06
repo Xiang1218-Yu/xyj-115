@@ -1,8 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AnimatedPage from "@/components/AnimatedPage";
+import withAnimation from "@/components/withAnimation";
 import Home from "@/pages/Home";
 import Market from "@/pages/Market";
 import ToolDetail from "@/pages/ToolDetail";
@@ -13,16 +15,12 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
 
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
-
-const pageTransition = {
-  duration: 0.4,
-  ease: "easeOut"
-};
+const AnimatedHome = withAnimation(Home);
+const AnimatedMarket = withAnimation(Market);
+const AnimatedToolDetail = withAnimation(ToolDetail);
+const AnimatedLogin = withAnimation(Login);
+const AnimatedRegister = withAnimation(Register);
+const AnimatedNotFound = withAnimation(NotFound);
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -30,61 +28,16 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route 
-          path="/" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <Home />
-            </motion.div>
-          } 
-        />
-        <Route 
-          path="/market" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <Market />
-            </motion.div>
-          } 
-        />
-        <Route 
-          path="/tool/:id" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <ToolDetail />
-            </motion.div>
-          } 
-        />
+        <Route path="/" element={<AnimatedHome />} />
+        <Route path="/market" element={<AnimatedMarket />} />
+        <Route path="/tool/:id" element={<AnimatedToolDetail />} />
         <Route 
           path="/subscriptions" 
           element={
             <ProtectedRoute>
-              <motion.div
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={pageTransition}
-              >
+              <AnimatedPage>
                 <Subscriptions />
-              </motion.div>
+              </AnimatedPage>
             </ProtectedRoute>
           } 
         />
@@ -92,15 +45,9 @@ function AnimatedRoutes() {
           path="/team" 
           element={
             <ProtectedRoute>
-              <motion.div
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={pageTransition}
-              >
+              <AnimatedPage>
                 <Team />
-              </motion.div>
+              </AnimatedPage>
             </ProtectedRoute>
           } 
         />
@@ -108,60 +55,15 @@ function AnimatedRoutes() {
           path="/profile" 
           element={
             <ProtectedRoute>
-              <motion.div
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={pageTransition}
-              >
+              <AnimatedPage>
                 <Profile />
-              </motion.div>
+              </AnimatedPage>
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/login" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <Login />
-            </motion.div>
-          } 
-        />
-        <Route 
-          path="/register" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <Register />
-            </motion.div>
-          } 
-        />
-        <Route 
-          path="*" 
-          element={
-            <motion.div
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-            >
-              <NotFound />
-            </motion.div>
-          } 
-        />
+        <Route path="/login" element={<AnimatedLogin />} />
+        <Route path="/register" element={<AnimatedRegister />} />
+        <Route path="*" element={<AnimatedNotFound />} />
       </Routes>
     </AnimatePresence>
   );
