@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Zap, Github, Chrome } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Zap } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 export default function Login() {
@@ -111,26 +111,6 @@ export default function Login() {
               {isLoading ? '登录中...' : '登录'}
             </button>
           </form>
-
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-700" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-dark-800/50 text-gray-500">或者使用</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-700 text-gray-300 hover:bg-white/5 transition-all">
-              <Chrome className="w-5 h-5" />
-              Google
-            </button>
-            <button className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-700 text-gray-300 hover:bg-white/5 transition-all">
-              <Github className="w-5 h-5" />
-              GitHub
-            </button>
-          </div>
 
           <p className="text-center text-gray-400 mt-8">
             还没有账户？{' '}

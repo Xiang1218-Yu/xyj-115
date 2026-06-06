@@ -35,8 +35,9 @@ const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 type TabType = 'active' | 'history' | 'billing';
 
 export default function Subscriptions() {
-  const { subscriptions } = useStore();
+  const { subscriptions, downloadInvoice } = useStore();
   const [activeTab, setActiveTab] = useState<TabType>('active');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active');
   const inactiveSubscriptions = subscriptions.filter(s => s.status !== 'active');
@@ -339,9 +340,17 @@ export default function Subscriptions() {
                           {bill.status === 'failed' && <span className="badge-expired">支付失败</span>}
                         </td>
                         <td className="py-4 px-4 text-right">
-                          <button className="text-primary-400 hover:text-primary-300 text-sm flex items-center gap-1 ml-auto">
-                            <Download className="w-4 h-4" />
-                            发票
+                          <button
+                            onClick={() => {
+                              setDownloadingId(bill.id);
+                              downloadInvoice(subscriptions[0]?.id || '');
+                              setTimeout(() => setDownloadingId(null), 1000);
+                            }}
+                            disabled={downloadingId === bill.id}
+                            className="text-primary-400 hover:text-primary-300 text-sm flex items-center gap-1 ml-auto disabled:opacity-50"
+                          >
+                            <Download className={cn('w-4 h-4', downloadingId === bill.id && 'animate-spin')} />
+                            {downloadingId === bill.id ? '下载中' : '发票'}
                           </button>
                         </td>
                       </tr>

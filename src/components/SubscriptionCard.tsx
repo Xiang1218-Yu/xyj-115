@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, RefreshCw, XCircle, CreditCard, Settings } from 'lucide-react';
+import { Calendar, RefreshCw, XCircle, CreditCard, Settings, Download, RotateCcw } from 'lucide-react';
 import type { UserSubscription } from '@/types';
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
@@ -10,7 +11,9 @@ interface SubscriptionCardProps {
 }
 
 export default function SubscriptionCard({ subscription, index = 0 }: SubscriptionCardProps) {
-  const { cancelSubscription, toggleAutoRenew } = useStore();
+  const { cancelSubscription, toggleAutoRenew, renewSubscription, downloadInvoice } = useStore();
+  const [isRenewing, setIsRenewing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const statusConfig = {
     active: { label: '活跃中', className: 'badge-active' },
@@ -73,36 +76,72 @@ export default function SubscriptionCard({ subscription, index = 0 }: Subscripti
       </div>
 
       {subscription.status === 'active' && (
-        <div className="flex items-center gap-2 pt-4 border-t border-gray-800">
+        <div className="space-y-3 pt-4 border-t border-gray-800">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => toggleAutoRenew(subscription.id)}
+              className={cn(
+                'flex-1 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all',
+                subscription.autoRenew
+                  ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                  : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+              )}
+            >
+              <RefreshCw className="w-4 h-4" />
+              {subscription.autoRenew ? '关闭自动续费' : '开启自动续费'}
+            </button>
+            <button
+              onClick={() => cancelSubscription(subscription.id)}
+              className="flex-1 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+            >
+              <XCircle className="w-4 h-4" />
+              取消订阅
+            </button>
+            <button className="p-2.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
           <button
-            onClick={() => toggleAutoRenew(subscription.id)}
-            className={cn(
-              'flex-1 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all',
-              subscription.autoRenew
-                ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
-            )}
+            onClick={() => {
+              setIsDownloading(true);
+              downloadInvoice(subscription.id);
+              setTimeout(() => setIsDownloading(false), 1000);
+            }}
+            disabled={isDownloading}
+            className="w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 bg-white/5 text-gray-300 hover:bg-white/10 transition-all disabled:opacity-50"
           >
-            <RefreshCw className="w-4 h-4" />
-            {subscription.autoRenew ? '关闭自动续费' : '开启自动续费'}
-          </button>
-          <button
-            onClick={() => cancelSubscription(subscription.id)}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
-          >
-            <XCircle className="w-4 h-4" />
-            取消订阅
-          </button>
-          <button className="p-2.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
-            <Settings className="w-4 h-4" />
+            <Download className="w-4 h-4" />
+            {isDownloading ? '下载中...' : '下载发票'}
           </button>
         </div>
       )}
 
       {subscription.status !== 'active' && (
-        <div className="pt-4 border-t border-gray-800">
-          <button className="w-full btn-primary text-sm">
-            重新订阅
+        <div className="space-y-3 pt-4 border-t border-gray-800">
+          <button
+            onClick={async () => {
+              setIsRenewing(true);
+              await new Promise(resolve => setTimeout(resolve, 500));
+              renewSubscription(subscription.id);
+              setIsRenewing(false);
+            }}
+            disabled={isRenewing}
+            className="w-full btn-primary text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <RotateCcw className={cn('w-4 h-4', isRenewing && 'animate-spin')} />
+            {isRenewing ? '续订中...' : '重新订阅'}
+          </button>
+          <button
+            onClick={() => {
+              setIsDownloading(true);
+              downloadInvoice(subscription.id);
+              setTimeout(() => setIsDownloading(false), 1000);
+            }}
+            disabled={isDownloading}
+            className="w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 bg-white/5 text-gray-300 hover:bg-white/10 transition-all disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {isDownloading ? '下载中...' : '下载发票'}
           </button>
         </div>
       )}

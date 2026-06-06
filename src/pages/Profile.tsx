@@ -14,7 +14,9 @@ import {
   Trash2,
   Laptop,
   Smartphone,
-  Tablet
+  Tablet,
+  Check,
+  X
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { loginDevices } from '@/mock/user';
@@ -23,9 +25,36 @@ import { cn } from '@/lib/utils';
 type TabType = 'profile' | 'security' | 'notifications';
 
 export default function Profile() {
-  const { user } = useStore();
+  const { 
+    user, 
+    updateUserProfile, 
+    changePassword, 
+    notificationSettings, 
+    updateNotificationSettings 
+  } = useStore();
+  
   const [activeTab, setActiveTab] = useState<TabType>('profile');
-  const [showPassword, setShowPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: '138****8888',
+    location: '北京市',
+    bio: '热爱技术，专注于产品设计和用户体验。致力于通过工具提升团队效率。',
+  });
+  
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [passwordError, setPasswordError] = useState('');
 
   const tabs = [
     { id: 'profile' as TabType, label: '个人信息', icon: User },
@@ -38,6 +67,95 @@ export default function Profile() {
     mobile: Smartphone,
     tablet: Tablet,
   };
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setProfileForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    setSaveStatus('saving');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    updateUserProfile({
+      name: profileForm.name,
+      email: profileForm.email,
+    });
+    
+    setSaveStatus('success');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  };
+
+  const handleCancelProfile = () => {
+    setProfileForm({
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: '138****8888',
+      location: '北京市',
+      bio: '热爱技术，专注于产品设计和用户体验。致力于通过工具提升团队效率。',
+    });
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({ ...prev, [name]: value }));
+    setPasswordError('');
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    setPasswordStatus('saving');
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('两次输入的新密码不匹配');
+      setPasswordStatus('error');
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError('密码长度至少为8个字符');
+      setPasswordStatus('error');
+      return;
+    }
+    
+    const success = await changePassword(passwordForm.oldPassword, passwordForm.newPassword);
+    
+    if (success) {
+      setPasswordStatus('success');
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setPasswordStatus('idle'), 2000);
+    } else {
+      setPasswordError('当前密码不正确');
+      setPasswordStatus('error');
+    }
+  };
+
+  const handleNotificationToggle = (key: keyof typeof notificationSettings) => {
+    updateNotificationSettings({
+      [key]: !notificationSettings[key],
+    });
+  };
+
+  const notificationItems = [
+    { key: 'subscriptionReminders' as const, name: '订阅到期提醒', desc: '订阅即将到期时发送提醒' },
+    { key: 'emailNotifications' as const, name: '账单通知', desc: '新账单生成时发送通知' },
+    { key: 'pushNotifications' as const, name: '团队邀请', desc: '收到团队邀请时发送通知' },
+    { key: 'marketingEmails' as const, name: '促销活动', desc: '接收优惠活动和促销信息' },
+    { key: 'securityAlerts' as const, name: '安全提醒', desc: '账户安全相关通知' },
+  ];
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-dark-950 pt-24 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white mb-4">请先登录</h2>
+          <p className="text-gray-400">登录后可查看和编辑个人信息</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-dark-950 pt-24">
@@ -65,19 +183,19 @@ export default function Profile() {
             <div className="card text-center">
               <div className="relative inline-block mb-4">
                 <img
-                  src={user?.avatar}
-                  alt={user?.name}
+                  src={user.avatar}
+                  alt={user.name}
                   className="w-24 h-24 rounded-2xl object-cover mx-auto"
                 />
                 <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white hover:bg-primary-400 transition-colors">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
-              <h2 className="text-xl font-bold text-white mb-1">{user?.name}</h2>
-              <p className="text-gray-400 text-sm mb-4">{user?.email}</p>
+              <h2 className="text-xl font-bold text-white mb-1">{user.name}</h2>
+              <p className="text-gray-400 text-sm mb-4">{user.email}</p>
               <div className="flex items-center justify-center gap-2 text-sm">
                 <span className="badge-active">已验证</span>
-                {user?.teamRole === 'admin' && (
+                {user.teamRole === 'admin' && (
                   <span className="px-2.5 py-1 rounded-full bg-gold-500/20 text-gold-400 text-xs font-medium border border-gold-500/30">
                     团队管理员
                   </span>
@@ -119,40 +237,88 @@ export default function Profile() {
                       <User className="w-4 h-4 text-gray-500" />
                       姓名
                     </label>
-                    <input type="text" defaultValue={user?.name} className="input" />
+                    <input 
+                      type="text" 
+                      name="name"
+                      value={profileForm.name}
+                      onChange={handleProfileChange}
+                      className="input" 
+                    />
                   </div>
                   <div>
                     <label className="label flex items-center gap-2">
                       <Mail className="w-4 h-4 text-gray-500" />
                       邮箱
                     </label>
-                    <input type="email" defaultValue={user?.email} className="input" />
+                    <input 
+                      type="email" 
+                      name="email"
+                      value={profileForm.email}
+                      onChange={handleProfileChange}
+                      className="input" 
+                    />
                   </div>
                   <div>
                     <label className="label flex items-center gap-2">
                       <Phone className="w-4 h-4 text-gray-500" />
                       手机号
                     </label>
-                    <input type="tel" defaultValue="138****8888" className="input" />
+                    <input 
+                      type="tel" 
+                      name="phone"
+                      value={profileForm.phone}
+                      onChange={handleProfileChange}
+                      className="input" 
+                    />
                   </div>
                   <div>
                     <label className="label flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-gray-500" />
                       地区
                     </label>
-                    <input type="text" defaultValue="北京市" className="input" />
+                    <input 
+                      type="text" 
+                      name="location"
+                      value={profileForm.location}
+                      onChange={handleProfileChange}
+                      className="input" 
+                    />
                   </div>
                 </div>
                 <div className="mt-6 pt-6 border-t border-gray-800">
                   <h4 className="text-lg font-semibold text-white mb-4">个人简介</h4>
                   <textarea
-                    defaultValue="热爱技术，专注于产品设计和用户体验。致力于通过工具提升团队效率。"
+                    name="bio"
+                    value={profileForm.bio}
+                    onChange={handleProfileChange}
                     className="input h-24 resize-none"
                   />
                 </div>
-                <div className="mt-6 flex gap-4">
-                  <button className="btn-primary">保存更改</button>
-                  <button className="btn-outline">取消</button>
+                <div className="mt-6 flex items-center gap-4">
+                  <button 
+                    onClick={handleSaveProfile}
+                    disabled={saveStatus === 'saving'}
+                    className="btn-primary disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saveStatus === 'saving' ? (
+                      <>保存中...</>
+                    ) : saveStatus === 'success' ? (
+                      <><Check className="w-4 h-4" /> 已保存</>
+                    ) : (
+                      '保存更改'
+                    )}
+                  </button>
+                  <button 
+                    onClick={handleCancelProfile}
+                    className="btn-outline"
+                  >
+                    取消
+                  </button>
+                  {saveStatus === 'success' && (
+                    <span className="text-green-400 text-sm flex items-center gap-1">
+                      <Check className="w-4 h-4" /> 个人信息已更新
+                    </span>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -174,27 +340,88 @@ export default function Profile() {
                       <label className="label">当前密码</label>
                       <div className="relative">
                         <input
-                          type={showPassword ? 'text' : 'password'}
+                          type={showOldPassword ? 'text' : 'password'}
+                          name="oldPassword"
+                          value={passwordForm.oldPassword}
+                          onChange={handlePasswordChange}
                           className="input pr-12"
                           placeholder="请输入当前密码"
                         />
                         <button
-                          onClick={() => setShowPassword(!showPassword)}
+                          type="button"
+                          onClick={() => setShowOldPassword(!showOldPassword)}
                           className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
                         >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          {showOldPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                       </div>
                     </div>
                     <div>
                       <label className="label">新密码</label>
-                      <input type="password" className="input" placeholder="请输入新密码" />
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          name="newPassword"
+                          value={passwordForm.newPassword}
+                          onChange={handlePasswordChange}
+                          className="input pr-12"
+                          placeholder="请输入新密码"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                        >
+                          {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="label">确认新密码</label>
-                      <input type="password" className="input" placeholder="请再次输入新密码" />
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          name="confirmPassword"
+                          value={passwordForm.confirmPassword}
+                          onChange={handlePasswordChange}
+                          className="input pr-12"
+                          placeholder="请再次输入新密码"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
-                    <button className="btn-primary">更新密码</button>
+                    
+                    {passwordError && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm flex items-center gap-2">
+                        <X className="w-4 h-4" />
+                        {passwordError}
+                      </div>
+                    )}
+                    
+                    {passwordStatus === 'success' && (
+                      <div className="p-3 bg-green-500/10 border border-green-500/50 rounded-lg text-green-400 text-sm flex items-center gap-2">
+                        <Check className="w-4 h-4" />
+                        密码修改成功！
+                      </div>
+                    )}
+                    
+                    <button 
+                      onClick={handleChangePassword}
+                      disabled={passwordStatus === 'saving'}
+                      className="btn-primary disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {passwordStatus === 'saving' ? (
+                        '更新中...'
+                      ) : (
+                        '更新密码'
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -246,8 +473,17 @@ export default function Profile() {
                       <p className="text-white font-medium">启用双因素认证</p>
                       <p className="text-gray-500 text-sm">使用身份验证器应用增强账户安全性</p>
                     </div>
-                    <button className="w-12 h-6 rounded-full bg-primary-500 relative">
-                      <span className="absolute right-1 top-1 w-4 h-4 rounded-full bg-white" />
+                    <button 
+                      onClick={() => handleNotificationToggle('securityAlerts')}
+                      className={cn(
+                        'w-12 h-6 rounded-full relative transition-colors',
+                        notificationSettings.securityAlerts ? 'bg-primary-500' : 'bg-gray-700'
+                      )}
+                    >
+                      <span className={cn(
+                        'absolute top-1 w-4 h-4 rounded-full bg-white transition-all',
+                        notificationSettings.securityAlerts ? 'right-1' : 'left-1'
+                      )} />
                     </button>
                   </div>
                 </div>
@@ -266,33 +502,34 @@ export default function Profile() {
                   通知偏好设置
                 </h3>
                 <div className="space-y-4">
-                  {[
-                    { name: '订阅到期提醒', desc: '订阅即将到期时发送提醒', enabled: true },
-                    { name: '账单通知', desc: '新账单生成时发送通知', enabled: true },
-                    { name: '团队邀请', desc: '收到团队邀请时发送通知', enabled: true },
-                    { name: '促销活动', desc: '接收优惠活动和促销信息', enabled: false },
-                    { name: '产品更新', desc: '工具功能更新通知', enabled: true },
-                    { name: '安全提醒', desc: '账户安全相关通知', enabled: true },
-                  ].map((item, index) => (
+                  {notificationItems.map((item, index) => (
                     <div
-                      key={item.name}
+                      key={item.key}
                       className="flex items-center justify-between p-4 bg-dark-900/50 rounded-xl"
                     >
                       <div>
                         <p className="text-white font-medium">{item.name}</p>
                         <p className="text-gray-500 text-sm">{item.desc}</p>
                       </div>
-                      <button className={cn(
-                        'w-12 h-6 rounded-full relative transition-colors',
-                        item.enabled ? 'bg-primary-500' : 'bg-gray-700'
-                      )}>
+                      <button
+                        onClick={() => handleNotificationToggle(item.key)}
+                        className={cn(
+                          'w-12 h-6 rounded-full relative transition-colors',
+                          notificationSettings[item.key] ? 'bg-primary-500' : 'bg-gray-700'
+                        )}
+                      >
                         <span className={cn(
                           'absolute top-1 w-4 h-4 rounded-full bg-white transition-all',
-                          item.enabled ? 'right-1' : 'left-1'
+                          notificationSettings[item.key] ? 'right-1' : 'left-1'
                         )} />
                       </button>
                     </div>
                   ))}
+                </div>
+                <div className="mt-6 pt-6 border-t border-gray-800">
+                  <p className="text-gray-400 text-sm">
+                    您可以随时更改通知偏好设置。我们不会向您发送垃圾邮件，您可以随时取消订阅。
+                  </p>
                 </div>
               </motion.div>
             )}

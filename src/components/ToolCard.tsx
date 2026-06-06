@@ -21,7 +21,7 @@ export default function ToolCard({ tool, index = 0 }: ToolCardProps) {
       whileHover={{ y: -4 }}
     >
       <Link
-        to={`/market/${tool.id}`}
+        to={`/tool/${tool.id}`}
         className="card-hover block group h-full"
       >
         <div className="flex items-start gap-4 mb-4">
