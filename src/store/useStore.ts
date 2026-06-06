@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, UserSubscription, Tool, Category } from '@/types';
+import type { User, UserSubscription, Tool, Category, SortOption, SubscriptionFilter, UsersRange } from '@/types';
 import { userSubscriptions } from '@/mock/subscriptions';
 import { tools } from '@/mock/tools';
 
@@ -17,6 +17,14 @@ interface Store {
   tools: Tool[];
   selectedCategory: Category | 'all';
   searchQuery: string;
+  sortBy: SortOption;
+  priceMin: number;
+  priceMax: number;
+  ratingMin: number;
+  ratingMax: number;
+  usersRange: UsersRange;
+  selectedTags: string[];
+  subscriptionFilter: SubscriptionFilter;
   isAuthenticated: boolean;
   notificationSettings: NotificationSettings;
   userPassword: string;
@@ -24,6 +32,13 @@ interface Store {
   setUser: (user: User | null) => void;
   setSelectedCategory: (category: Category | 'all') => void;
   setSearchQuery: (query: string) => void;
+  setSortBy: (sort: SortOption) => void;
+  setPriceRange: (min: number, max: number) => void;
+  setRatingRange: (min: number, max: number) => void;
+  setUsersRange: (range: UsersRange) => void;
+  setSelectedTags: (tags: string[]) => void;
+  toggleTag: (tag: string) => void;
+  setSubscriptionFilter: (filter: SubscriptionFilter) => void;
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -36,6 +51,9 @@ interface Store {
   toggleAutoRenew: (id: string) => void;
   downloadInvoice: (id: string) => void;
   getFilteredTools: () => Tool[];
+  clearAllFilters: () => void;
+  getAllTags: () => string[];
+  getPriceRange: () => { min: number; max: number };
 }
 
 const defaultNotificationSettings: NotificationSettings = {
@@ -52,6 +70,14 @@ export const useStore = create<Store>((set, get) => ({
   tools: tools,
   selectedCategory: 'all',
   searchQuery: '',
+  sortBy: 'popular',
+  priceMin: 0,
+  priceMax: 1000,
+  ratingMin: 0,
+  ratingMax: 5,
+  usersRange: 'all',
+  selectedTags: [],
+  subscriptionFilter: 'all',
   isAuthenticated: false,
   notificationSettings: defaultNotificationSettings,
   userPassword: '',
@@ -61,6 +87,24 @@ export const useStore = create<Store>((set, get) => ({
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   
   setSearchQuery: (query) => set({ searchQuery: query }),
+  
+  setSortBy: (sort) => set({ sortBy: sort }),
+  
+  setPriceRange: (min, max) => set({ priceMin: min, priceMax: max }),
+  
+  setRatingRange: (min, max) => set({ ratingMin: min, ratingMax: max }),
+  
+  setUsersRange: (range) => set({ usersRange: range }),
+  
+  setSelectedTags: (tags) => set({ selectedTags: tags }),
+  
+  toggleTag: (tag) => set((state) => ({
+    selectedTags: state.selectedTags.includes(tag)
+      ? state.selectedTags.filter(t => t !== tag)
+      : [...state.selectedTags, tag]
+  })),
+  
+  setSubscriptionFilter: (filter) => set({ subscriptionFilter: filter }),
   
   login: async (email, password) => {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -191,14 +235,104 @@ export const useStore = create<Store>((set, get) => ({
   },
   
   getFilteredTools: () => {
-    const { tools, selectedCategory, searchQuery } = get();
-    return tools.filter((tool) => {
+    const { tools, selectedCategory, searchQuery, priceMin, priceMax, ratingMin, ratingMax, usersRange, selectedTags, subscriptionFilter, sortBy, subscriptions } = get();
+    
+    const filtered = tools.filter((tool) => {
       const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
-      const matchesSearch = 
+      
+      const matchesSearch = !searchQuery ||
         tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tool.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tool.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
+      
+      const minPrice = Math.min(...tool.plans.map(p => p.price));
+      const matchesPrice = minPrice >= priceMin && minPrice <= priceMax;
+      
+      const matchesRating = tool.rating >= ratingMin && tool.rating <= ratingMax;
+      
+      let matchesUsers = true;
+      switch (usersRange) {
+        case 'lt-10k':
+          matchesUsers = tool.usersCount < 10000;
+          break;
+        case '10k-50k':
+          matchesUsers = tool.usersCount >= 10000 && tool.usersCount < 50000;
+          break;
+        case '50k-100k':
+          matchesUsers = tool.usersCount >= 50000 && tool.usersCount < 100000;
+          break;
+        case 'gt-100k':
+          matchesUsers = tool.usersCount >= 100000;
+          break;
+      }
+      
+      const matchesTags = selectedTags.length === 0 ||
+        selectedTags.every(tag => tool.tags.includes(tag));
+      
+      let matchesSubscription = true;
+      const userSub = subscriptions.find(s => s.toolId === tool.id);
+      switch (subscriptionFilter) {
+        case 'subscribed':
+          matchesSubscription = !!userSub && userSub.status === 'active';
+          break;
+        case 'not-subscribed':
+          matchesSubscription = !userSub || userSub.status !== 'active';
+          break;
+        case 'expired':
+          matchesSubscription = !!userSub && userSub.status === 'expired';
+          break;
+      }
+      
+      return matchesCategory && matchesSearch && matchesPrice && matchesRating && matchesUsers && matchesTags && matchesSubscription;
     });
+    
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'rating':
+          return b.rating - a.rating;
+        case 'price-low':
+          return Math.min(...a.plans.map(p => p.price)) - Math.min(...b.plans.map(p => p.price));
+        case 'price-high':
+          return Math.min(...b.plans.map(p => p.price)) - Math.min(...a.plans.map(p => p.price));
+        case 'newest':
+          return parseInt(b.id) - parseInt(a.id);
+        case 'users-desc':
+          return b.usersCount - a.usersCount;
+        case 'users-asc':
+          return a.usersCount - b.usersCount;
+        case 'popular':
+        default:
+          return b.usersCount - a.usersCount;
+      }
+    });
+  },
+  
+  clearAllFilters: () => set({
+    selectedCategory: 'all',
+    searchQuery: '',
+    sortBy: 'popular',
+    priceMin: 0,
+    priceMax: 1000,
+    ratingMin: 0,
+    ratingMax: 5,
+    usersRange: 'all',
+    selectedTags: [],
+    subscriptionFilter: 'all',
+  }),
+  
+  getAllTags: () => {
+    const { tools } = get();
+    const tagSet = new Set<string>();
+    tools.forEach(tool => tool.tags.forEach(tag => tagSet.add(tag)));
+    return Array.from(tagSet).sort();
+  },
+  
+  getPriceRange: () => {
+    const { tools } = get();
+    const prices = tools.flatMap(tool => tool.plans.map(p => p.price));
+    return {
+      min: Math.min(...prices),
+      max: Math.max(...prices),
+    };
   },
 }));

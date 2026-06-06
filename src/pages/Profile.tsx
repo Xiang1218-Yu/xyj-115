@@ -502,7 +502,7 @@ export default function Profile() {
                   通知偏好设置
                 </h3>
                 <div className="space-y-4">
-                  {notificationItems.map((item, index) => (
+                  {notificationItems.map((item) => (
                     <div
                       key={item.key}
                       className="flex items-center justify-between p-4 bg-dark-900/50 rounded-xl"
