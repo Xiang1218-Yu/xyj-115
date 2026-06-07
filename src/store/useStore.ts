@@ -46,8 +46,25 @@ interface TeamSettings {
   sessionTimeout: boolean;
 }
 
+const generateUserId = (email: string): string => {
+  const [username, domain] = email.toLowerCase().split('@');
+  const cleanUsername = username.replace(/[^a-z0-9]/g, '');
+  const cleanDomain = domain ? domain.split('.')[0].replace(/[^a-z0-9]/g, '') : 'com';
+  return `user-${cleanUsername}-${cleanDomain}`;
+};
+
+const mockUsers: User[] = [
+  {
+    id: 'user-zhangming-example',
+    name: '张明',
+    email: 'zhangming@example.com',
+    avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20asian%20male%20avatar%20portrait%20simple&image_size=square',
+  },
+];
+
 interface Store {
   user: User | null;
+  users: User[];
   subscriptions: UserSubscription[];
   tools: Tool[];
   teamMembers: TeamMember[];
@@ -137,6 +154,7 @@ export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       user: null,
+      users: mockUsers,
       subscriptions: defaultSubscriptions,
       tools: defaultTools,
       teamMembers: defaultTeamMembers,
@@ -187,21 +205,30 @@ export const useStore = create<Store>()(
       
       login: async (email, password) => {
         await new Promise(resolve => setTimeout(resolve, 500));
-        const { userPassword, user } = get();
+        const { userPassword, users } = get();
         
         if (email && password) {
-          if (user && user.email === email && userPassword === password) {
-            set({ isAuthenticated: true });
+          const userId = generateUserId(email);
+          const existingUser = users.find(u => u.id === userId || u.email === email);
+          
+          if (existingUser) {
+            set({ user: existingUser, isAuthenticated: true });
             return true;
           }
           
           const newUser: User = {
-            id: 'user-' + Date.now(),
+            id: userId,
             name: email.split('@')[0],
             email: email,
-            avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
+            avatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20asian%20avatar%20portrait%20${encodeURIComponent(email.split('@')[0])}&image_size=square`,
           };
-          set({ user: newUser, isAuthenticated: true, userPassword: password });
+          
+          set({ 
+            user: newUser, 
+            isAuthenticated: true, 
+            userPassword: password,
+            users: [...users.filter(u => u.email !== email), newUser]
+          });
           return true;
         }
         return false;
@@ -210,11 +237,12 @@ export const useStore = create<Store>()(
       register: async (name, email, password, referralCode) => {
         await new Promise(resolve => setTimeout(resolve, 500));
         if (name && email && password) {
+          const userId = generateUserId(email);
           const newUser: User = {
-            id: 'user-' + Date.now(),
+            id: userId,
             name: name,
             email: email,
-            avatar: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20user%20avatar%20portrait%20simple%20minimal&image_size=square',
+            avatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20asian%20avatar%20portrait%20${encodeURIComponent(name)}&image_size=square`,
           };
           
           let referrerInfo: { code: ReferralCode; recordId: string } | null = null;
@@ -246,7 +274,13 @@ export const useStore = create<Store>()(
             }
           }
           
-          set({ user: newUser, isAuthenticated: true, userPassword: password, pendingReferralCode: null });
+          set((state) => ({ 
+            user: newUser, 
+            isAuthenticated: true, 
+            userPassword: password, 
+            pendingReferralCode: null,
+            users: [...state.users.filter(u => u.email !== email), newUser]
+          }));
           
           if (referrerInfo && !get().referralSettings.requireSubscription) {
             get().issueReferralRewardsInternal(referrerInfo.code, referrerInfo.recordId, newUser.id, name);
@@ -681,26 +715,93 @@ export const useStore = create<Store>()(
       },
 
       getReferralLeaderboard: () => {
-        const { referralLeaderboard, user } = get();
+        const { referralCodes, referralRecords, coupons, referralLeaderboard, user } = get();
         
-        if (user && !referralLeaderboard.some(item => item.userId === user.id)) {
+        const userStats = new Map<string, {
+          referralCount: number;
+          subscribedCount: number;
+          totalRewards: number;
+          userName: string;
+          userAvatar: string;
+        }>();
+        
+        referralCodes.forEach(code => {
+          userStats.set(code.userId, {
+            referralCount: 0,
+            subscribedCount: 0,
+            totalRewards: 0,
+            userName: code.userName,
+            userAvatar: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20asian%20avatar%20portrait%20${encodeURIComponent(code.userName)}&image_size=square`,
+          });
+        });
+        
+        referralLeaderboard.forEach(item => {
+          if (!userStats.has(item.userId)) {
+            userStats.set(item.userId, {
+              referralCount: item.referralCount,
+              subscribedCount: item.subscribedCount,
+              totalRewards: item.totalRewards,
+              userName: item.userName,
+              userAvatar: item.userAvatar,
+            });
+          }
+        });
+        
+        referralRecords.forEach(record => {
+          const stats = userStats.get(record.referrerId);
+          if (stats) {
+            stats.referralCount++;
+            if (record.status === 'subscribed' || record.status === 'completed') {
+              stats.subscribedCount++;
+            }
+          }
+        });
+        
+        coupons.forEach(coupon => {
+          if (coupon.source === 'referral') {
+            const stats = userStats.get(coupon.userId);
+            if (stats) {
+              stats.totalRewards += coupon.amount;
+            }
+          }
+        });
+        
+        if (user) {
           const myProgress = get().getMyReferralProgress();
-          const myRank = referralLeaderboard.filter(item => item.referralCount > myProgress.totalInvites).length + 1;
-          
-          const myEntry: ReferralLeaderboardItem = {
-            rank: myRank,
-            userId: user.id,
-            userName: user.name,
-            userAvatar: user.avatar,
+          userStats.set(user.id, {
             referralCount: myProgress.totalInvites,
             subscribedCount: myProgress.subscribedCount,
             totalRewards: myProgress.totalRewards,
-          };
-          
-          return [...referralLeaderboard, myEntry].sort((a, b) => a.rank - b.rank);
+            userName: user.name,
+            userAvatar: user.avatar,
+          });
         }
         
-        return referralLeaderboard.sort((a, b) => a.rank - b.rank);
+        const leaderboardList: ReferralLeaderboardItem[] = Array.from(userStats.entries())
+          .map(([userId, stats]) => ({
+            userId,
+            userName: stats.userName,
+            userAvatar: stats.userAvatar,
+            referralCount: stats.referralCount,
+            subscribedCount: stats.subscribedCount,
+            totalRewards: stats.totalRewards,
+            rank: 0,
+          }))
+          .sort((a, b) => {
+            if (b.totalRewards !== a.totalRewards) {
+              return b.totalRewards - a.totalRewards;
+            }
+            if (b.referralCount !== a.referralCount) {
+              return b.referralCount - a.referralCount;
+            }
+            return b.subscribedCount - a.subscribedCount;
+          })
+          .map((item, index) => ({
+            ...item,
+            rank: index + 1,
+          }));
+        
+        return leaderboardList;
       },
 
       useCoupon: (couponId, amount) => {
@@ -820,6 +921,7 @@ export const useStore = create<Store>()(
 
       resetToDefaults: () => set({
         user: null,
+        users: mockUsers,
         subscriptions: defaultSubscriptions,
         teamMembers: defaultTeamMembers,
         teamSettings: defaultTeamSettings,
@@ -849,6 +951,7 @@ export const useStore = create<Store>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
+        users: state.users,
         subscriptions: state.subscriptions,
         teamMembers: state.teamMembers,
         teamSettings: state.teamSettings,
