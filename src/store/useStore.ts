@@ -293,7 +293,7 @@ export const useStore = create<Store>()(
         return false;
       },
       
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: () => set({ user: null, isAuthenticated: false, userPassword: '' }),
       
       updateUserProfile: (updates) =>
         set((state) => ({
