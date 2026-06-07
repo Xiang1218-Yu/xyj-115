@@ -11,6 +11,7 @@ import ToolDetail from "@/pages/ToolDetail";
 import Subscriptions from "@/pages/Subscriptions";
 import Team from "@/pages/Team";
 import Profile from "@/pages/Profile";
+import Referral from "@/pages/Referral";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import NotFound from "@/pages/NotFound";
@@ -18,6 +19,7 @@ import NotFound from "@/pages/NotFound";
 const AnimatedHome = withAnimation(Home);
 const AnimatedMarket = withAnimation(Market);
 const AnimatedToolDetail = withAnimation(ToolDetail);
+const AnimatedReferral = withAnimation(Referral);
 const AnimatedLogin = withAnimation(Login);
 const AnimatedRegister = withAnimation(Register);
 const AnimatedNotFound = withAnimation(NotFound);
@@ -57,6 +59,16 @@ function AnimatedRoutes() {
             <ProtectedRoute>
               <AnimatedPage>
                 <Profile />
+              </AnimatedPage>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/referral" 
+          element={
+            <ProtectedRoute>
+              <AnimatedPage>
+                <Referral />
               </AnimatedPage>
             </ProtectedRoute>
           } 

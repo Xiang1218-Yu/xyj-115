@@ -157,3 +157,83 @@ export interface DrillDownData {
     date: string;
   }[];
 }
+
+export type CouponStatus = 'available' | 'used' | 'expired';
+export type CouponType = 'fixed' | 'percentage';
+export type ReferralStatus = 'registered' | 'subscribed' | 'completed';
+
+export interface ReferralCode {
+  id: string;
+  code: string;
+  userId: string;
+  userName: string;
+  createdAt: string;
+  usedCount: number;
+  maxUses: number;
+  expiresAt: string;
+  isActive: boolean;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  userId: string;
+  name: string;
+  description: string;
+  amount: number;
+  type: CouponType;
+  minPurchase: number;
+  status: CouponStatus;
+  source: 'referral' | 'promotion' | 'system';
+  referralRecordId?: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+}
+
+export interface ReferralRecord {
+  id: string;
+  referrerId: string;
+  referrerName: string;
+  referredId: string;
+  referredName: string;
+  referredEmail: string;
+  referralCode: string;
+  status: ReferralStatus;
+  referrerRewardId?: string;
+  referredRewardId?: string;
+  registeredAt: string;
+  subscribedAt?: string;
+  completedAt?: string;
+}
+
+export interface ReferralProgress {
+  userId: string;
+  totalInvites: number;
+  registeredCount: number;
+  subscribedCount: number;
+  totalRewards: number;
+  rewardsUsed: number;
+  rewardsAvailable: number;
+  level: number;
+  nextLevelCount: number;
+}
+
+export interface ReferralLeaderboardItem {
+  rank: number;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  referralCount: number;
+  subscribedCount: number;
+  totalRewards: number;
+}
+
+export interface ReferralSettings {
+  rewardAmount: number;
+  rewardType: CouponType;
+  minPurchase: number;
+  validDays: number;
+  maxUsesPerCode: number;
+  requireSubscription: boolean;
+}

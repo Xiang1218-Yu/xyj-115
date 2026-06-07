@@ -1,28 +1,57 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Zap, User, Check } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, Zap, User, Check, Gift, Info } from 'lucide-react';
 import { useStore } from '@/store/useStore';
+import { cn } from '@/lib/utils';
 
 export default function Register() {
-  const { register, isAuthenticated } = useStore();
+  const { register, isAuthenticated, validateReferralCode, setPendingReferralCode, referralSettings } = useStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refParam = searchParams.get('ref');
+  
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    referralCode: refParam || '',
     agreeTerms: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [referralValidation, setReferralValidation] = useState<{ valid: boolean; message: string; userName?: string } | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/', { replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (refParam) {
+      handleValidateReferral(refParam);
+    }
+  }, [refParam]);
+
+  const handleValidateReferral = (code: string) => {
+    if (!code.trim()) {
+      setReferralValidation(null);
+      return;
+    }
+    const result = validateReferralCode(code);
+    if (result) {
+      setReferralValidation({ 
+        valid: true, 
+        message: `推荐码有效！推荐人：${result.userName}`,
+        userName: result.userName
+      });
+    } else {
+      setReferralValidation({ valid: false, message: '推荐码无效或已过期' });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,9 +67,19 @@ export default function Register() {
       return;
     }
     
+    if (formData.referralCode && (!referralValidation || !referralValidation.valid)) {
+      setError('请输入有效的推荐码');
+      return;
+    }
+    
     setIsLoading(true);
     
-    const success = await register(formData.name, formData.email, formData.password);
+    const success = await register(
+      formData.name, 
+      formData.email, 
+      formData.password,
+      formData.referralCode || undefined
+    );
     
     if (success) {
       navigate('/');
@@ -180,6 +219,55 @@ export default function Register() {
               </div>
             </div>
 
+            <div>
+              <label className="label flex items-center gap-2">
+                <Gift className="w-4 h-4 text-primary-400" />
+                推荐码 <span className="text-gray-500 font-normal">(可选)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="referralCode"
+                  value={formData.referralCode}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setReferralValidation(null);
+                  }}
+                  onBlur={() => handleValidateReferral(formData.referralCode)}
+                  placeholder="输入好友的推荐码"
+                  className="input pl-4 pr-4 uppercase"
+                />
+              </div>
+              {referralValidation && (
+                <div className={cn(
+                  'mt-2 flex items-start gap-2 p-3 rounded-lg text-sm',
+                  referralValidation.valid 
+                    ? 'bg-green-500/10 border border-green-500/30 text-green-400' 
+                    : 'bg-red-500/10 border border-red-500/30 text-red-400'
+                )}>
+                  {referralValidation.valid ? (
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <p>{referralValidation.message}</p>
+                    {referralValidation.valid && (
+                      <p className="text-xs mt-1 opacity-80">
+                        双方将各获得 ¥{referralSettings.rewardAmount} 订阅优惠券
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {!formData.referralCode && (
+                <p className="text-gray-500 text-xs mt-2 flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  没有推荐码？直接注册也可，后续可在推荐页面输入
+                </p>
+              )}
+            </div>
+
             <div className="flex items-start gap-2">
               <input
                 type="checkbox"
@@ -224,6 +312,4 @@ export default function Register() {
   );
 }
 
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
-}
+

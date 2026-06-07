@@ -11,7 +11,8 @@ import {
   X, 
   LogOut,
   ChevronDown,
-  Zap
+  Zap,
+  Gift
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ const publicNavItems = [
 
 const privateNavItems = [
   { to: '/subscriptions', label: '订阅管理', icon: CreditCard, requiresAuth: true },
+  { to: '/referral', label: '推荐好友', icon: Gift, requiresAuth: true, badge: true },
   { to: '/team', label: '团队协作', icon: Users, requiresAuth: true },
 ];
 
@@ -153,6 +155,17 @@ export default function Navbar() {
                         <User className="w-4 h-4" />
                         个人中心
                       </Link>
+                      <Link
+                        to="/referral"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-gray-300 hover:text-white hover:bg-white/5"
+                      >
+                        <Gift className="w-4 h-4" />
+                        推荐好友
+                        <span className="ml-auto px-1.5 py-0.5 text-xs bg-primary-500/20 text-primary-400 rounded">
+                          赚¥50
+                        </span>
+                      </Link>
                       <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10"
@@ -247,7 +260,7 @@ export default function Navbar() {
             </nav>
 
             {isAuthenticated && user && (
-              <div className="mt-8 pt-6 border-t border-gray-800">
+              <div className="mt-8 pt-6 border-t border-gray-800 space-y-1">
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
@@ -262,6 +275,22 @@ export default function Navbar() {
                     <p className="font-medium text-white">{user.name}</p>
                     <p className="text-sm text-gray-400">个人中心</p>
                   </div>
+                </Link>
+                <Link
+                  to="/referral"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 rounded-xl"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center">
+                    <Gift className="w-4 h-4 text-primary-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-white">推荐好友</p>
+                    <p className="text-sm text-gray-400">邀请好友获得优惠券</p>
+                  </div>
+                  <span className="px-1.5 py-0.5 text-xs bg-primary-500/20 text-primary-400 rounded">
+                    赚¥50
+                  </span>
                 </Link>
               </div>
             )}

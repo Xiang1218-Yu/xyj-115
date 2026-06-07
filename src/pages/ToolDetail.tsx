@@ -13,21 +13,27 @@ import {
   Zap,
   Clock,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Ticket,
+  ChevronDown
 } from 'lucide-react';
 import { tools, categories } from '@/mock/tools';
 import { useStore } from '@/store/useStore';
 import ToolCard from '@/components/ToolCard';
-import type { Plan, PlanPeriod } from '@/types';
+import type { Plan, PlanPeriod, Coupon } from '@/types';
+import { cn } from '@/lib/utils';
 
 export default function ToolDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addSubscription } = useStore();
+  const { addSubscription, getMyCoupons, isAuthenticated } = useStore();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [currentScreenshot, setCurrentScreenshot] = useState(0);
   const [isYearly, setIsYearly] = useState(false);
+  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
+  const [showCouponDropdown, setShowCouponDropdown] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
 
   const tool = tools.find(t => t.id === id);
 
@@ -47,8 +53,20 @@ export default function ToolDetail() {
   const categoryInfo = categories.find(c => c.id === tool.category);
   const relatedTools = tools.filter(t => t.category === tool.category && t.id !== tool.id).slice(0, 3);
 
+  const availableCoupons = isAuthenticated ? getMyCoupons('available') : [];
+  const originalPrice = selectedPlan ? (isYearly ? Math.round(selectedPlan.price * 12 * 0.8) : selectedPlan.price) : 0;
+  const discountAmount = selectedCoupon 
+    ? Math.min(
+        selectedCoupon.type === 'fixed' ? selectedCoupon.amount : Math.round(originalPrice * selectedCoupon.amount / 100),
+        originalPrice
+      )
+    : 0;
+  const finalPrice = Math.max(0, originalPrice - discountAmount);
+
   const handleSubscribe = () => {
     if (!selectedPlan) return;
+    
+    setSubscribeError('');
     
     const period: PlanPeriod = isYearly ? 'yearly' : 'monthly';
     const newSubscription = {
@@ -57,7 +75,7 @@ export default function ToolDetail() {
       toolName: tool.name,
       toolLogo: tool.logo,
       planName: selectedPlan.name,
-      price: isYearly ? Math.round(selectedPlan.price * 12 * 0.8) : selectedPlan.price,
+      price: originalPrice,
       period,
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date(Date.now() + (isYearly ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -65,9 +83,15 @@ export default function ToolDetail() {
       autoRenew: true,
     };
     
-    addSubscription(newSubscription);
-    setShowSubscribeModal(false);
-    navigate('/subscriptions');
+    const result = addSubscription(newSubscription, selectedCoupon?.id);
+    
+    if (result.success) {
+      setShowSubscribeModal(false);
+      setSelectedCoupon(null);
+      navigate('/subscriptions');
+    } else {
+      setSubscribeError(result.message || '订阅失败，请重试');
+    }
   };
 
   const nextScreenshot = () => {
@@ -392,13 +416,130 @@ export default function ToolDetail() {
                   <span className="text-gray-400">付费周期</span>
                   <span className="text-white font-medium">{isYearly ? '年付' : '月付'}</span>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-gray-700">
-                  <span className="text-gray-400">应付金额</span>
-                  <span className="text-2xl font-bold gradient-text">
-                    ¥{selectedPlan ? (isYearly ? Math.round(selectedPlan.price * 12 * 0.8) : selectedPlan.price) : 0}
-                  </span>
+                
+                {availableCoupons.length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-400">优惠券</span>
+                      <span className="text-xs text-primary-400">{availableCoupons.length} 张可用</span>
+                    </div>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowCouponDropdown(!showCouponDropdown)}
+                        className={cn(
+                          'w-full flex items-center justify-between p-3 rounded-lg border transition-all',
+                          selectedCoupon 
+                            ? 'bg-primary-500/10 border-primary-500/30' 
+                            : 'bg-dark-800 border-gray-700 hover:border-gray-600'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Ticket className="w-4 h-4 text-primary-400" />
+                          {selectedCoupon ? (
+                            <span className="text-white">
+                              {selectedCoupon.type === 'fixed' ? '¥' : ''}{selectedCoupon.amount}{selectedCoupon.type === 'percentage' ? '%' : ''} 优惠券
+                              <span className="text-gray-400 text-xs ml-2">
+                                (满 ¥{selectedCoupon.minPurchase} 可用)
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">选择优惠券</span>
+                          )}
+                        </div>
+                        <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', showCouponDropdown && 'rotate-180')} />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showCouponDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute top-full left-0 right-0 mt-2 bg-dark-800 border border-gray-700 rounded-lg overflow-hidden z-10 max-h-60 overflow-y-auto"
+                          >
+                            <button
+                              onClick={() => {
+                                setSelectedCoupon(null);
+                                setShowCouponDropdown(false);
+                              }}
+                              className={cn(
+                                'w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-gray-700',
+                                !selectedCoupon && 'bg-primary-500/10'
+                              )}
+                            >
+                              <span className="text-gray-400">不使用优惠券</span>
+                            </button>
+                            {availableCoupons.map((coupon) => {
+                              const isUsable = originalPrice >= coupon.minPurchase;
+                              return (
+                                <button
+                                  key={coupon.id}
+                                  onClick={() => {
+                                    if (isUsable) {
+                                      setSelectedCoupon(coupon);
+                                      setShowCouponDropdown(false);
+                                    }
+                                  }}
+                                  disabled={!isUsable}
+                                  className={cn(
+                                    'w-full text-left p-3 hover:bg-white/5 transition-colors border-b border-gray-700/50 last:border-0',
+                                    selectedCoupon?.id === coupon.id && 'bg-primary-500/10',
+                                    !isUsable && 'opacity-50 cursor-not-allowed'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <span className="text-white font-medium">
+                                        {coupon.type === 'fixed' ? '¥' : ''}{coupon.amount}{coupon.type === 'percentage' ? '%' : ''} {coupon.name}
+                                      </span>
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        满 ¥{coupon.minPurchase} 可用 · 有效期至 {coupon.expiresAt}
+                                      </p>
+                                    </div>
+                                    {!isUsable && (
+                                      <span className="text-xs text-red-400">金额不足</span>
+                                    )}
+                                    {isUsable && selectedCoupon?.id === coupon.id && (
+                                      <Check className="w-4 h-4 text-primary-400" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="pt-3 border-t border-gray-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">原价</span>
+                    <span className={cn(discountAmount > 0 ? 'text-gray-500 line-through' : 'text-white font-medium')}>
+                      ¥{originalPrice}
+                    </span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">优惠券抵扣</span>
+                      <span className="text-green-400 font-medium">-¥{discountAmount}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
+                    <span className="text-gray-300 font-medium">应付金额</span>
+                    <span className="text-2xl font-bold gradient-text">
+                      ¥{finalPrice}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {subscribeError && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                  {subscribeError}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button
