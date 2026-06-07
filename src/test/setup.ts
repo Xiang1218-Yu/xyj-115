@@ -1,8 +1,16 @@
 import '@testing-library/jest-dom';
 import { beforeEach, vi } from 'vitest';
 
-class LocalStorageMock {
+class LocalStorageMock implements Storage {
   private store: Record<string, string> = {};
+
+  get length(): number {
+    return Object.keys(this.store).length;
+  }
+
+  key(index: number): string | null {
+    return Object.keys(this.store)[index] || null;
+  }
 
   getItem(key: string): string | null {
     return this.store[key] || null;

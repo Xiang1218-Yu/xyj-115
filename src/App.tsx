@@ -1,20 +1,46 @@
+import { Suspense, lazy, ComponentType } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AnimatedPage from "@/components/AnimatedPage";
-import withAnimation from "@/components/withAnimation";
-import Home from "@/pages/Home";
-import Market from "@/pages/Market";
-import ToolDetail from "@/pages/ToolDetail";
-import Subscriptions from "@/pages/Subscriptions";
-import Team from "@/pages/Team";
-import Profile from "@/pages/Profile";
-import Referral from "@/pages/Referral";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import NotFound from "@/pages/NotFound";
+
+const Home = lazy(() => import("@/pages/Home"));
+const Market = lazy(() => import("@/pages/Market"));
+const ToolDetail = lazy(() => import("@/pages/ToolDetail"));
+const Subscriptions = lazy(() => import("@/pages/Subscriptions"));
+const Team = lazy(() => import("@/pages/Team"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Referral = lazy(() => import("@/pages/Referral"));
+const Login = lazy(() => import("@/pages/Login"));
+const Register = lazy(() => import("@/pages/Register"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+function PageLoader() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex items-center justify-center min-h-[400px]"
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-400 text-sm">加载中...</p>
+      </div>
+    </motion.div>
+  );
+}
+
+function withAnimation<P extends object>(WrappedComponent: ComponentType<P>) {
+  return function AnimatedComponent(props: P) {
+    return (
+      <AnimatedPage>
+        <WrappedComponent {...props} />
+      </AnimatedPage>
+    );
+  };
+}
 
 const AnimatedHome = withAnimation(Home);
 const AnimatedMarket = withAnimation(Market);
@@ -90,7 +116,9 @@ function Layout() {
     <div className="min-h-screen bg-dark-950 text-white">
       {showLayout && <Navbar />}
       <main className={showLayout ? 'pt-20' : ''}>
-        <AnimatedRoutes />
+        <Suspense fallback={<PageLoader />}>
+          <AnimatedRoutes />
+        </Suspense>
       </main>
       {showLayout && <Footer />}
     </div>
