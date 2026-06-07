@@ -25,7 +25,6 @@ import {
   referralCodes as defaultReferralCodes, 
   coupons as defaultCoupons, 
   referralRecords as defaultReferralRecords,
-  referralProgress as defaultReferralProgress,
   referralLeaderboard as defaultReferralLeaderboard,
   referralSettings as defaultReferralSettings,
 } from '@/mock/referral';
@@ -205,13 +204,16 @@ export const useStore = create<Store>()(
       
       login: async (email, password) => {
         await new Promise(resolve => setTimeout(resolve, 500));
-        const { userPassword, users } = get();
+        const { userPassword: storedPassword, users } = get();
         
         if (email && password) {
           const userId = generateUserId(email);
           const existingUser = users.find(u => u.id === userId || u.email === email);
           
           if (existingUser) {
+            if (storedPassword && storedPassword !== password) {
+              return false;
+            }
             set({ user: existingUser, isAuthenticated: true });
             return true;
           }

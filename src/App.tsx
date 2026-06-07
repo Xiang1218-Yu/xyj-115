@@ -68,7 +68,7 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <AnimatedPage>
-                <Referral />
+                <AnimatedReferral />
               </AnimatedPage>
             </ProtectedRoute>
           } 

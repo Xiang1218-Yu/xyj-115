@@ -6,7 +6,7 @@ import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 
 export default function Register() {
-  const { register, isAuthenticated, validateReferralCode, setPendingReferralCode, referralSettings } = useStore();
+  const { register, isAuthenticated, validateReferralCode, referralSettings } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refParam = searchParams.get('ref');
@@ -31,10 +31,27 @@ export default function Register() {
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
+    const validateCode = (code: string) => {
+      if (!code.trim()) {
+        setReferralValidation(null);
+        return;
+      }
+      const result = validateReferralCode(code);
+      if (result) {
+        setReferralValidation({ 
+          valid: true, 
+          message: `推荐码有效！推荐人：${result.userName}`,
+          userName: result.userName
+        });
+      } else {
+        setReferralValidation({ valid: false, message: '推荐码无效或已过期' });
+      }
+    };
+    
     if (refParam) {
-      handleValidateReferral(refParam);
+      validateCode(refParam);
     }
-  }, [refParam]);
+  }, [refParam, validateReferralCode]);
 
   const handleValidateReferral = (code: string) => {
     if (!code.trim()) {
